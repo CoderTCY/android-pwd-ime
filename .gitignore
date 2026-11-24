@@ -1,0 +1,9 @@
+build/
+HANDOVER.md
+*.pfx
+*.jks
+*.keystore
+*.apk
+*.idsig
+.DS_Store
+Thumbs.db

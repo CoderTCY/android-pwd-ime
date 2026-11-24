@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.pwdime.switcher"
+    android:versionCode="4"
+    android:versionName="1.0.0">
+
+    <uses-sdk android:minSdkVersion="28" android:targetSdkVersion="36" />
+
+    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS" />
+
+    <!-- targetSdk 30+ 包可见性：列出其他输入法包需要 QUERY_ALL_PACKAGES
+         或按 intent 查询。IME 服务的 intent action 无法静态预知全部第三方
+         包名，取通用宽授权（配置类工具的标准做法）。 -->
+    <queries>
+        <intent>
+            <action android:name="android.view.InputMethod" />
+        </intent>
+    </queries>
+
+    <application
+        android:allowBackup="false"
+        android:description="@string/module_description"
+        android:label="@string/app_name">
+
+        <activity
+            android:name="com.pwdime.app.ConfigActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="de.robv.android.xposed.category.MODULE_SETTINGS" />
+            </intent-filter>
+        </activity>
+
+        <!-- 桌面启动器入口独立为别名：隐藏图标时仅禁用此别名，主 ConfigActivity 保持启用，
+             Vector/LSPosed 经 MODULE_SETTINGS 入口与 adb am start 始终可用。 -->
+        <activity-alias
+            android:name="com.pwdime.app.LauncherAlias"
+            android:exported="true"
+            android:targetActivity="com.pwdime.app.ConfigActivity">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity-alias>
+    </application>
+</manifest>

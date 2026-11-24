@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">PwdImeSwitcher</string>
+    <string name="module_description">密码输入框与终端视图自动切换输入法（Android 16，作用域仅系统框架，Vector API 102）</string>
+</resources>
