@@ -5,5 +5,6 @@ HANDOVER.md
 *.keystore
 *.apk
 *.idsig
+.env
 .DS_Store
 Thumbs.db
