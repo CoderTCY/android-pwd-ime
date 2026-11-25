@@ -66,7 +66,7 @@ chmod +x build.sh
 - 优先使用环境变量 `KEYSTORE_B64`（CI Secrets）或 `KEYSTORE_PATH` / 本地 `keystore.pfx`（配合 `KEYSTORE_PASS`、`KEY_ALIAS`、`KEY_PASS`、`KEYSTORE_TYPE`）。
 - 未提供签名密钥时自动生成临时调试证书 `build/debug.pfx` 完成签名，仓库本身不包含私钥文件。
 
-已内置双平台 CI 工作流（构建产物 `build/apk/PwdImeSwitcher.apk`，可选配置上述签名 Secrets）：
+已内置双平台 CI 工作流（构建产物 `build/apk/PwdImeSwitcher.apk`，可选配置上述签名 Secrets；推送 `v*` 标签或在 `workflow_dispatch` 指定 `release_tag` 时自动创建 Release 并上传 APK）：
 - GitHub Actions：`.github/workflows/build.yml`
 - Codeberg / Forgejo Actions：`.forgejo/workflows/build.yml`
 

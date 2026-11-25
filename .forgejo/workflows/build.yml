@@ -4,10 +4,18 @@ on:
   push:
   pull_request:
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: 'Optional tag to publish a Codeberg Release (e.g. v1.0.0)'
+        required: false
+        default: ''
+        type: string
 
 jobs:
   build:
     runs-on: codeberg-medium
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout repository
@@ -19,9 +27,9 @@ jobs:
           if [ "$(id -u)" -ne 0 ] && command -v sudo >/dev/null 2>&1; then
             SUDO="sudo"
           fi
-          if ! command -v javac >/dev/null 2>&1 || ! command -v curl >/dev/null 2>&1 || ! command -v unzip >/dev/null 2>&1; then
+          if ! command -v javac >/dev/null 2>&1 || ! command -v curl >/dev/null 2>&1 || ! command -v unzip >/dev/null 2>&1 || ! command -v jq >/dev/null 2>&1; then
             $SUDO apt-get update
-            $SUDO apt-get install -y --no-install-recommends openjdk-17-jdk-headless curl unzip ca-certificates
+            $SUDO apt-get install -y --no-install-recommends openjdk-17-jdk-headless curl unzip jq ca-certificates
           fi
 
           SDK_DIR="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/android-sdk}}"
@@ -53,3 +61,48 @@ jobs:
         with:
           name: PwdImeSwitcher-apk
           path: build/apk/PwdImeSwitcher.apk
+
+      - name: Publish Codeberg Release
+        if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && inputs.release_tag != '')
+        env:
+          FORGEJO_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          API_URL: ${{ github.api_url }}
+          REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
+          TARGET_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          API="${API_URL:-https://codeberg.org/api/v1}"
+          AUTH="Authorization: token ${FORGEJO_TOKEN}"
+
+          RESP="$(curl -sS -w '\n%{http_code}' -H "$AUTH" "${API}/repos/${REPO}/releases/tags/${RELEASE_TAG}")"
+          HTTP_CODE="${RESP##*$'\n'}"
+          BODY="${RESP%$'\n'*}"
+
+          if [ "$HTTP_CODE" = "200" ]; then
+            RELEASE_ID="$(printf '%s' "$BODY" | jq -r '.id')"
+          elif [ "$HTTP_CODE" = "404" ]; then
+            PAYLOAD="$(jq -nc \
+              --arg tag "$RELEASE_TAG" \
+              --arg name "PwdImeSwitcher $RELEASE_TAG" \
+              --arg body "Automated release for $RELEASE_TAG ($TARGET_SHA)." \
+              --arg target "$TARGET_SHA" \
+              '{tag_name: $tag, name: $name, body: $body, target_commitish: $target, draft: false, prerelease: false}')"
+            CREATE_RESP="$(curl -fsS -X POST -H "$AUTH" -H "Content-Type: application/json" \
+              -d "$PAYLOAD" "${API}/repos/${REPO}/releases")"
+            RELEASE_ID="$(printf '%s' "$CREATE_RESP" | jq -r '.id')"
+          else
+            echo "Unexpected HTTP status $HTTP_CODE querying release: $BODY" >&2
+            exit 1
+          fi
+
+          EXISTING_ASSET_ID="$(curl -fsS -H "$AUTH" "${API}/repos/${REPO}/releases/${RELEASE_ID}/assets" \
+            | jq -r '.[] | select(.name == "PwdImeSwitcher.apk") | .id' | head -n 1)"
+          if [ -n "$EXISTING_ASSET_ID" ]; then
+            curl -fsS -X DELETE -H "$AUTH" "${API}/repos/${REPO}/releases/${RELEASE_ID}/assets/${EXISTING_ASSET_ID}"
+          fi
+
+          curl -fsS -X POST -H "$AUTH" \
+            -F "attachment=@build/apk/PwdImeSwitcher.apk" \
+            "${API}/repos/${REPO}/releases/${RELEASE_ID}/assets?name=PwdImeSwitcher.apk" >/dev/null
+          echo "Published PwdImeSwitcher.apk to release ${RELEASE_TAG} (id=${RELEASE_ID})"
